@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ATM Interface with Receipt</title>
+    <style>
+        body {
+            background-color: #111;
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+        .atm {
+            background: #003366;
+            padding: 20px;
+            width: 360px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        p {
+            min-height: 60px;
+        }
+        input {
+            width: 90%;
+            padding: 10px;
+            font-size: 18px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        button {
+            width: 90%;
+            padding: 12px;
+            font-size: 16px;
+            margin: 6px auto;
+            cursor: pointer;
+            display: block;
+        }
+        .hidden {
+            display: none;
+        }
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .keypad button {
+            width: 100%;
+            padding: 14px;
+            font-size: 18px;
+        }
+        .green { background: #2ecc71; }
+        .red { background: #e74c3c; }
+        .yellow { background: #f1c40f; }
+        .receipt {
+            background: #012b4d;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="atm">
+    <h2 id="title">Welcome</h2>
+    <p id="message">Set your 4-digit PIN</p>
+
+    <input type="password" id="input" maxlength="4" readonly>
+
+    <div class="keypad" id="keypad">
+        <button onclick="press(1)">1</button>
+        <button onclick="press(2)">2</button>
+        <button onclick="press(3)">3</button>
+        <button onclick="press(4)">4</button>
+        <button onclick="press(5)">5</button>
+        <button onclick="press(6)">6</button>
+        <button onclick="press(7)">7</button>
+        <button onclick="press(8)">8</button>
+        <button onclick="press(9)">9</button>
+        <button class="yellow" onclick="clearInput()">Clear</button>
+        <button onclick="press(0)">0</button>
+        <button class="green" onclick="enter()">Enter</button>
+        <button class="red" onclick="exitATM()">Exit</button>
+    </div>
+</div>
+
+<script>
+    let pin = "", tempPin = "";
+    let balance = 0;
+    let stage = "setPin";
+    let attempts = 0;
+    let receiptData = {};
+
+    function press(num) {
+        if (input.value.length < input.maxLength) input.value += num;
+    }
+
+    function clearInput() {
+        input.value = "";
+    }
+
+    function enter() {
+        if (stage === "setPin" || stage === "confirmPin") handlePin();
+        else if (stage === "login") login();
+        else if (stage === "withdraw") confirmWithdraw();
+        else if (stage === "deposit") confirmDeposit();
+    }
+
+    function handlePin() {
+        let val = input.value;
+        if (val.length !== 4) {
+            showMessage("PIN must be 4 digits");
+            return;
+        }
+        if (stage === "setPin") {
+            tempPin = val;
+            stage = "confirmPin";
+            showMessage("Confirm your PIN");
+        } else {
+            if (val === tempPin) {
+                pin = val;
+                stage = "login";
+                showMessage("PIN set. Enter PIN to login");
+            } else {
+                stage = "setPin";
+                showMessage("PIN mismatch. Set PIN again");
+            }
+        }
+        clearInput();
+    }
+
+    function login() {
+        let val = input.value;
+        if (val !== pin) {
+            attempts++;
+            if (attempts >= 3) {
+                showMessage("Card blocked due to 3 wrong attempts");
+                keypad.classList.add("hidden");
+                return;
+            }
+            showMessage("Wrong PIN. Attempts left: " + (3 - attempts));
+            clearInput();
+            return;
+        }
+        attempts = 0;
+        showMenu();
+    }
+
+    function showMenu() {
+        stage = "menu";
+        title.innerText = "ATM Menu";
+        input.classList.add("hidden");
+        keypad.classList.add("hidden");
+        message.innerHTML = `
+            <button onclick="checkBalance()">Balance Enquiry</button>
+            <button onclick="startWithdraw()">Withdraw</button>
+            <button onclick="startDeposit()">Deposit</button>
+            <button onclick="exitATM()">Exit</button>
+        `;
+    }
+
+    function checkBalance() {
+        receiptData = {
+            type: "Balance Enquiry",
+            amount: "-",
+            balance: balance
+        };
+        showReceipt();
+    }
+
+    function startWithdraw() {
+        stage = "withdraw";
+        input.type = "number";
+        input.value = "";
+        input.classList.remove("hidden");
+        keypad.classList.remove("hidden");
+        showMessage("Enter amount to withdraw");
+    }
+
+    function confirmWithdraw() {
+        let amt = Number(input.value);
+        if (amt <= 0 || amt > balance) {
+            showMessage("Invalid amount");
+            message.innerHTML += `
+                <button onclick="showMenu()">Back to Menu</button>
+                <button onclick="exitATM()">Exit</button>
+            `;
+            return;
+        }
+        balance -= amt;
+        receiptData = {
+            type: "Withdrawal",
+            amount: amt,
+            balance: balance
+        };
+        showReceipt();
+    }
+
+    function startDeposit() {
+        stage = "deposit";
+        input.type = "number";
+        input.value = "";
+        input.classList.remove("hidden");
+        keypad.classList.remove("hidden");
+        showMessage("Enter amount to deposit");
+    }
+
+    function confirmDeposit() {
+        let amt = Number(input.value);
+        if (amt <= 0) {
+            showMessage("Invalid amount");
+            message.innerHTML += `
+                <button onclick="showMenu()">Back to Menu</button>
+                <button onclick="exitATM()">Exit</button>
+            `;
+            return;
+        }
+        balance += amt;
+        receiptData = {
+            type: "Deposit",
+            amount: amt,
+            balance: balance
+        };
+        showReceipt();
+    }
+
+    function showReceipt() {
+        stage = "receipt";
+        input.classList.add("hidden");
+        keypad.classList.add("hidden");
+
+        let now = new Date().toLocaleString();
+
+        message.innerHTML = `
+            <div class="receipt">
+                <strong>ATM RECEIPT</strong><br><br>
+                Transaction : ${receiptData.type}<br>
+                Amount      : ${receiptData.amount}<br>
+                Balance     : ₹${receiptData.balance}<br>
+                Date & Time : ${now}<br>
+                Status      : SUCCESS
+            </div>
+            <button onclick="showMenu()">Another Transaction</button>
+            <button onclick="exitATM()">Exit</button>
+        `;
+    }
+
+    function exitATM() {
+        location.reload();
+    }
+
+    function showMessage(msg) {
+        message.innerHTML = msg;
+    }
+</script>
+
+</body>
+</html>
